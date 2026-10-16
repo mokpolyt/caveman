@@ -123,6 +123,7 @@ function update(dt,t){
  people.forEach((p,i)=>{
   if(p.dead){p.respawn-=dt;if(p.respawn<=0){p.dead=false;p.x=75;p.y=262;p.act="walk";p.tx=rnd(160,700);p.ty=rnd(365,420);p.timer=4;p.emo=null;p.scare=0;parts.push({type:"txt",s:p.name+" is back!",size:13,x:75,y:222,vy:-15,life:2.2,max:2.2})}return}
   if(p.carriedBy){p.x=p.carriedBy.x;p.y=p.carriedBy.y;return}
+  if(nightMode && weather==="none" && i%2===0 && !p.inside){p.act="sleep";p.emo="💤";p.tx=p.x;p.ty=p.y;return}
   if(weather==="thunder"){
    if(p.delay>0){p.delay-=dt;p.act="shock";return}
    if(p.inside)return;
@@ -464,6 +465,7 @@ function drawPerson(p,t,x,y,mode){
 function draw(ts){
  const t=ts/1000;
  const dt=Math.min(.05,(ts-(draw.last||ts))/1000);draw.last=ts;
+ updateWorldCycles(t);
  update(dt,t);
  ctx.save();ctx.clearRect(0,0,900,560);
  if(shake>0)ctx.translate(Math.sin(t*60)*5*shake,Math.cos(t*73)*4*shake);
