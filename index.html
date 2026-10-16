@@ -30,7 +30,7 @@ footer{text-align:center;color:#9a8064;font-size:12px;padding:0 18px 24px}
 <header>
  <div class="brand">🪨 STONE AGE / tiny wild world</div>
  <h1>Seven little weirdos.</h1>
- <p class="sub">Four men, three women, doing random things. Then you send the weather.</p>
+ <p class="sub">A tiny tribe: fishing, elections, visitors, and completely unhinged disasters.</p>
 </header>
 <main>
 <section class="panel">
@@ -155,6 +155,7 @@ function update(dt,t){
 
 // ---------- random scenes ----------
 let scenes=[],parts=[],sceneClock=5,lastScene=-1,sceneShake=0,extraDark=0;
+let electionClock=420,flyerClock=540,flyerActive=0;
 const sun={x:760,y:80,on:true,crack:0};
 const bump=v=>{sceneShake=Math.max(sceneShake,v)};
 const alive=()=>people.filter(p=>!p.dead&&!p.inside&&!p.carriedBy&&!p.carry);
@@ -302,6 +303,34 @@ const SCENES=[
  upd(dt,t){ds.forEach(d=>{const x=-60+(t-d.t0)*800;if(!d.hit&&t>d.t0&&x>d.v.x&&!d.v.dead){d.hit=1;pop(d.v);kill(d.v)}})},
  drw(t){ds.forEach(d=>{const x=-60+(t-d.t0)*800;if(!d.v.dead)d.y=d.v.y-22;if(t>d.t0&&x<980){ctx.save();ctx.translate(x,d.y);ctx.rotate(t*18);ctx.font="34px system-ui";ctx.textAlign="center";ctx.fillStyle="#30251e";ctx.fillText("🗡️",0,10);ctx.restore();ctx.strokeStyle="#ffffff99";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x-90,d.y);ctx.lineTo(x-20,d.y);ctx.stroke()}})}}}]
 ];
+
+// ---------- additional chaotic village events ----------
+function addPerson(name, x, y, modern=false){
+ const p={name,g:Math.random()<.5?"m":"f",skin:modern?"#e2b38a":["#b96e43","#d89b68","#8c543b","#c77d4c"][Math.floor(Math.random()*4)],hair:modern?"#222831":"#33241d",x,y,phase:Math.random()*6,tx:x,ty:y,act:"chat",timer:3,inside:false,carry:null,carriedBy:null,face:1,dead:false,respawn:0,emo:modern?"🧢":null,scare:0};
+ people.push(p); return p;
+}
+function aliveCount(){return people.filter(p=>!p.dead).length}
+function fryFish(x,y){parts.push({type:"txt",s:"🐟 → 🍳",size:22,x,y:y-65,vy:-12,life:2,max:2});}
+SCENES.push(
+ ["tank","🛡️ A tank rolls in and fires!",()=>{scareAll(3);let hit=0;return{dur:7,
+  upd(dt,t){if(t>2&&!hit){hit=1;bump(1.4);boom(570,410,100);alive().filter(p=>Math.random()<.7).forEach(kill)}},
+  drw(t){const x=t<2?-180+t*190:200+Math.min(1,(t-2)/3)*120;ctx.fillStyle="#59634a";ctx.fillRect(x,350,190,65);ctx.fillRect(x+35,315,90,40);ctx.fillStyle="#30352b";for(let i=0;i<5;i++){ctx.beginPath();ctx.arc(x+20+i*36,420,15,0,7);ctx.fill()}ctx.fillStyle="#30352b";ctx.fillRect(x+115,320,105,12);if(t>1.8&&t<3){ctx.strokeStyle="#ffb347";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x+220,326);ctx.lineTo(x+340,390);ctx.stroke();label("BOOM!",x+320,370,25,"#b02f1d")}}}}],
+ ["aliens","👽 A plane drops four aliens!",()=>{scareAll(4);let landed=false;return{dur:9,
+  upd(dt,t){if(t>3&&!landed){landed=true;for(let i=0;i<4;i++)addPerson("Alien "+(i+1),220+i*95,390);alive().filter(p=>!p.name.startsWith("Alien")&&Math.random()<.55).forEach(kill);bump(1)}},
+  drw(t){const x=t<3?760-t*150:310;const y=t<3?40+t*95:325;bigEmoji("✈️",x,y,75,0,1);if(t>2.8){[0,1,2,3].forEach(i=>bigEmoji("👽",260+i*100,365,32))}}}}],
+ ["ship","🚢 A ship arrives with modern visitors.",()=>{for(let i=0;i<7;i++)addPerson("Visitor "+(i+1),120+i*90,385,true);return{dur:9,
+  upd(dt,t){people.filter(p=>p.name.startsWith("Visitor")).forEach(p=>{p.act="chat";p.emo="💬"})},
+  drw(t){bigEmoji("🚢",t<3?950-t*210:320,280,110);if(t>2)label("Modern people meet the tribe 🤝",450,220,21,"#254f66")},end(){people.filter(p=>p.name.startsWith("Visitor")).forEach(p=>{p.dead=true;p.respawn=999999})}}}],
+ ["beach","🏖️ Some villagers run to the beach.",()=>{return{dur:6,upd(dt,t){if(t>1&&t<1.2&&aliveCount()>=8){const a=alive().slice(0,Math.max(0,aliveCount()-4));a.forEach(p=>{p.dead=true;p.respawn=999999;p.x=850;p.y=480});parts.push({type:"txt",s:"Population falls to 4",size:20,x:450,y:250,vy:-10,life:3,max:3})}},drw(t){bigEmoji("🏖️",800,450,90);if(t>1)label("The beach...",760,390,18)}}}],
+ ["sky-people","🌠 People descend from the sky!",()=>{let done=false;return{dur:6,upd(dt,t){if(t>1&&!done&&aliveCount()<=3){done=true;while(aliveCount()<7)addPerson("Sky visitor "+(aliveCount()+1),100+Math.random()*700,365+Math.random()*50);parts.push({type:"txt",s:"Population restored to 7!",size:20,x:450,y:245,vy:-10,life:3,max:3})}},drw(t){if(t<2)bigEmoji("🪂",450,60+t*100,65)}}}],
+ ["sea-snacks","🧽⭐ Sponge and starfish appear!",()=>{let done=false;return{dur:8,upd(dt,t){if(t>2&&!done){done=true;people.forEach(p=>{if(!p.dead){p.act="dance";p.emo="😍"}});parts.push({type:"txt",s:"The tribe adores them… then fries them!",size:18,x:450,y:240,vy:-5,life:4,max:4});fryFish(450,360)}},drw(t){if(t<3){bigEmoji("🧽",390,420,55);bigEmoji("⭐",485,420,55)}else{bigEmoji("🍳",440,415,70);bigEmoji("⭐",490,385,35)}}}}],
+ ["clown","🤡 A clown arrives. The crowd cheers…",()=>{let hit=false;people.forEach(p=>{if(!p.dead)p.emo="👏"});return{dur:7,upd(dt,t){if(t>3&&!hit){hit=true;bump(1.5);alive().forEach(p=>{pop(p);kill(p)});parts.push({type:"txt",s:"THE SHOW IS OVER",size:26,x:450,y:230,vy:-8,life:3,max:3})}},drw(t){bigEmoji("🤡",450,260,100);if(t<3)label("YAAAY! 👏👏👏",450,340,24);else label("😱",450,350,30)}}}],
+ ["giant-87","🧍 Someone becomes gigantic for 87 seconds!",()=>{const v=pickAlive();const gx=v?v.x:450,gy=v?v.y:390;return{dur:87,upd(dt,t){if(v&&!v.dead){v.act="shock";v.emo="😲"}},drw(t){ctx.save();ctx.translate(gx,gy+20);ctx.scale(4.5,4.5);drawPerson(v||people[0],t,0,0,"shock");ctx.restore();label("GIANT MODE: "+Math.ceil(87-t)+"s",450,95,20,"#5d4b9a")},end(){if(v)v.emo=null}}}],
+ ["zombies","🧟 Helicopter drops hungry zombies!",()=>{scareAll(5);let hit=false;return{dur:8,upd(dt,t){if(t>3&&!hit){hit=true;const a=alive().sort(()=>Math.random()-.5);a.slice(0,Math.max(0,a.length-1)).forEach(kill);parts.push({type:"txt",s:"Almost everyone eaten!",size:22,x:450,y:230,vy:-10,life:3,max:3})}},drw(t){bigEmoji("🚁",t<3?900-t*190:330,100+t*12,75);if(t>2){bigEmoji("🧟",250,375,48);bigEmoji("🧟",450,375,48);bigEmoji("🧟",650,375,48)}}}}],
+ ["boxing","🥊 The villagers hold a boxing match!",()=>{const ab=two();if(!ab)return{dur:5};const [a,b]=ab;return{dur:8,upd(dt,t){a.act=b.act="dance";a.emo=b.emo="🥊";if(t>1){a.x=390+Math.sin(t*5)*22;b.x=510-Math.sin(t*5)*22}if(t>2){people.filter(p=>p!==a&&p!==b&&!p.dead).forEach(p=>{p.act="dance";p.emo="👏"})}},drw(t){label("ROUND "+(Math.floor(t/2)+1),450,250,24);if(t>2)label("POW! 💥",450,320,22)},end(){a.emo=b.emo=null}}}],
+ ["frying-fish","🍳 The tribe fries fish by the river.",()=>{people.forEach(p=>{if(!p.dead){p.act="eat";p.emo="🐟"}});return{dur:7,upd(dt,t){if(t>1&&Math.random()<dt*1.5)fryFish(rnd(150,750),410)},drw(t){bigEmoji("🍳",450,420,65);label("Fresh fish, sizzling away!",450,340,18)},end(){people.forEach(p=>p.emo=null)}}}]
+);
+
 const villagerScene=withHead=>()=>{
  const ab=two();if(!ab)return{dur:.1};const A=ab[0],B=ab[1];
  B.act="shock";B.timer=8;A.timer=30;A.act="run";let st=0,tt=0;
