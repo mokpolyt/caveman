@@ -156,6 +156,30 @@ function update(dt,t){
 // ---------- random scenes ----------
 let scenes=[],parts=[],sceneClock=5,lastScene=-1,sceneShake=0,extraDark=0;
 let electionClock=420,flyerClock=540,flyerActive=0;
+// World cycles: day/night every 4 minutes, village every 5 minutes, flyer every 3 minutes.
+let worldVillage="river", nightMode=false, lastDayNightCycle=-1, lastVillageCycle=0, lastFlyerCycle=0, flyerStart=-999;
+function updateWorldCycles(t){
+ const cycle=Math.floor(t/240);
+ if(cycle!==lastDayNightCycle){
+  lastDayNightCycle=cycle; nightMode=(cycle%2===1);
+  if(nightMode){people.forEach(p=>{if(!p.dead&&!p.inside&&!p.carriedBy){p.act="sleep";p.emo="💤";p.tx=p.x;p.ty=p.y;}});$("caption").textContent="🌙 Night falls. The tribe sleeps on the sand.";}
+  else {people.forEach(p=>{if(!p.dead&&!p.inside&&!p.carriedBy){p.emo=null;p.act="walk";p.timer=1;p.tx=rnd(40,860);p.ty=rnd(365,425);}});$("caption").textContent="☀️ Sunrise! The tribe wakes up.";}
+ }
+ const villageCycle=Math.floor(t/300);
+ if(villageCycle!==lastVillageCycle){lastVillageCycle=villageCycle;worldVillage=(villageCycle%2===1)?"forest":"river";$("caption").textContent=worldVillage==="forest"?"🌲 The tribe has moved to a deep forest village with a pyramid!":"🏞️ The tribe returns to the riverside village.";}
+ const flyerCycle=Math.floor(t/180);
+ if(flyerCycle!==lastFlyerCycle){lastFlyerCycle=flyerCycle;flyerStart=t;}
+ flyerActive=(t-flyerStart>=0&&t-flyerStart<22)?1:0;
+}
+function drawFlyingMan(t){
+ if(!flyerActive)return;
+ const elapsed=t-flyerStart, x=-80+(980*(elapsed/22)), y=115+Math.sin(elapsed*1.5)*22;
+ ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(elapsed*2)*.05);
+ // A harmless person gliding horizontally under a large orange sheet.
+ ctx.fillStyle="#f58225";ctx.beginPath();ctx.moveTo(-8,-10);ctx.quadraticCurveTo(-75,-55,-120,-18);ctx.quadraticCurveTo(-70,-6,-12,5);ctx.closePath();ctx.fill();
+ ctx.strokeStyle="#594331";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-12,0);ctx.lineTo(-2,22);ctx.lineTo(16,28);ctx.moveTo(-2,22);ctx.lineTo(-20,30);ctx.moveTo(-8,7);ctx.lineTo(-26,17);ctx.moveTo(-8,7);ctx.lineTo(9,15);ctx.stroke();
+ ctx.fillStyle="#b96e43";ctx.beginPath();ctx.arc(-7,-5,8,0,Math.PI*2);ctx.fill();ctx.fillStyle="#33241d";ctx.beginPath();ctx.arc(-9,-9,8,Math.PI,Math.PI*2);ctx.fill();ctx.restore();
+}
 const sun={x:760,y:80,on:true,crack:0};
 const bump=v=>{sceneShake=Math.max(sceneShake,v)};
 const alive=()=>people.filter(p=>!p.dead&&!p.inside&&!p.carriedBy&&!p.carry);
@@ -445,20 +469,30 @@ function draw(ts){
  if(shake>0)ctx.translate(Math.sin(t*60)*5*shake,Math.cos(t*73)*4*shake);
  const wdark=weather==="thunder"?.55:weather==="rain"||weather==="flood"?.32:0;const dark=Math.max(wdark,extraDark);
  let sky=ctx.createLinearGradient(0,0,0,420);sky.addColorStop(0,"#9bd5d7");sky.addColorStop(1,"#e7e8b9");ctx.fillStyle=sky;ctx.fillRect(-10,-10,920,570);
- if(!wdark)drawSun(t);
+ if(!wdark&&!nightMode)drawSun(t);
+ if(nightMode){ctx.fillStyle="#182644";ctx.globalAlpha=.78;ctx.fillRect(-10,-10,920,570);ctx.globalAlpha=1;ctx.fillStyle="#f4f0d1";ctx.beginPath();ctx.arc(760,80,29,0,Math.PI*2);ctx.fill();for(let i=0;i<35;i++){const sx=(i*137+31)%900,sy=(i*71+17)%260;ctx.fillStyle="rgba(255,255,220,.8)";ctx.fillRect(sx,sy,2,2);}}
  cloud(110+Math.sin(t*.1)*12,78,.8);cloud(430,115,.55);
  ctx.fillStyle="#a7c89a";ctx.beginPath();ctx.moveTo(0,310);ctx.quadraticCurveTo(150,190,300,310);ctx.quadraticCurveTo(510,180,680,300);ctx.quadraticCurveTo(790,240,900,300);ctx.lineTo(900,560);ctx.lineTo(0,560);ctx.fill();
- // cave
- ctx.fillStyle="#8e745c";ctx.beginPath();ctx.moveTo(0,255);ctx.lineTo(0,130);ctx.quadraticCurveTo(65,30,160,120);ctx.lineTo(195,255);ctx.closePath();ctx.fill();
- ctx.fillStyle="#493b32";ctx.beginPath();ctx.moveTo(20,255);ctx.lineTo(22,170);ctx.quadraticCurveTo(68,95,124,170);ctx.lineTo(143,255);ctx.closePath();ctx.fill();
- // river
- ctx.fillStyle="#77c9d0";ctx.beginPath();ctx.moveTo(0,435);ctx.quadraticCurveTo(170,395,310,440);ctx.quadraticCurveTo(500,480,660,428);ctx.quadraticCurveTo(790,398,900,430);ctx.lineTo(900,560);ctx.lineTo(0,560);ctx.fill();
- ctx.strokeStyle="#c4f0e7";ctx.lineWidth=3;for(let i=0;i<6;i++){let x=((t*35+i*177)%950)-25,y=458+i*16;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+20,y-4,x+44,y);ctx.stroke()}
- ctx.fillStyle="#d8c18a";ctx.beginPath();ctx.moveTo(0,360);ctx.quadraticCurveTo(300,330,470,365);ctx.quadraticCurveTo(690,340,900,360);ctx.lineTo(900,450);ctx.lineTo(0,450);ctx.fill();
- tree(845,350,1);tree(195,350,.65);
- // house (always there)
- ctx.fillStyle="#a77b4c";ctx.beginPath();ctx.roundRect(335,265,150,88,7);ctx.fill();
- ctx.fillStyle="#c18b55";ctx.beginPath();ctx.moveTo(315,275);ctx.lineTo(410,205);ctx.lineTo(505,275);ctx.closePath();ctx.fill();
+ if(worldVillage==="forest"){
+  // Dense forest village with a stepped stone pyramid, while all villagers/events continue.
+  ctx.fillStyle="#416a4b";ctx.beginPath();ctx.moveTo(0,310);ctx.quadraticCurveTo(150,190,300,310);ctx.quadraticCurveTo(510,180,680,300);ctx.quadraticCurveTo(790,240,900,300);ctx.lineTo(900,560);ctx.lineTo(0,560);ctx.fill();
+  for(let i=0;i<13;i++){const x=(i*83+25)%930;tree(x,350+(i%3)*22,.75+(i%4)*.12)}
+  ctx.fillStyle="#d8c18a";ctx.beginPath();ctx.moveTo(0,390);ctx.quadraticCurveTo(300,360,470,390);ctx.quadraticCurveTo(690,370,900,390);ctx.lineTo(900,560);ctx.lineTo(0,560);ctx.fill();
+  // stepped jungle pyramid
+  ctx.fillStyle="#827b69";ctx.beginPath();ctx.moveTo(320,365);ctx.lineTo(360,320);ctx.lineTo(390,320);ctx.lineTo(410,285);ctx.lineTo(440,285);ctx.lineTo(460,250);ctx.lineTo(490,285);ctx.lineTo(520,285);ctx.lineTo(540,320);ctx.lineTo(570,320);ctx.lineTo(610,365);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#a69b80";for(let i=0;i<4;i++){ctx.fillRect(365-i*15,330-i*27,200+i*30,8)}
+  ctx.fillStyle="#493b32";ctx.fillRect(445,330,38,35);label("JUNGLE PYRAMID",465,238,12,"#fff1cf");
+ }else{
+  // riverside village
+  ctx.fillStyle="#8e745c";ctx.beginPath();ctx.moveTo(0,255);ctx.lineTo(0,130);ctx.quadraticCurveTo(65,30,160,120);ctx.lineTo(195,255);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#493b32";ctx.beginPath();ctx.moveTo(20,255);ctx.lineTo(22,170);ctx.quadraticCurveTo(68,95,124,170);ctx.lineTo(143,255);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#77c9d0";ctx.beginPath();ctx.moveTo(0,435);ctx.quadraticCurveTo(170,395,310,440);ctx.quadraticCurveTo(500,480,660,428);ctx.quadraticCurveTo(790,398,900,430);ctx.lineTo(900,560);ctx.lineTo(0,560);ctx.fill();
+  ctx.strokeStyle="#c4f0e7";ctx.lineWidth=3;for(let i=0;i<6;i++){let x=((t*35+i*177)%950)-25,y=458+i*16;ctx.beginPath();ctx.moveTo(x,y);ctx.quadraticCurveTo(x+20,y-4,x+44,y);ctx.stroke()}
+  ctx.fillStyle="#d8c18a";ctx.beginPath();ctx.moveTo(0,360);ctx.quadraticCurveTo(300,330,470,365);ctx.quadraticCurveTo(690,340,900,360);ctx.lineTo(900,450);ctx.lineTo(0,450);ctx.fill();
+  tree(845,350,1);tree(195,350,.65);
+  ctx.fillStyle="#a77b4c";ctx.beginPath();ctx.roundRect(335,265,150,88,7);ctx.fill();
+  ctx.fillStyle="#c18b55";ctx.beginPath();ctx.moveTo(315,275);ctx.lineTo(410,205);ctx.lineTo(505,275);ctx.closePath();ctx.fill();
+ }
  const inside=people.filter(p=>p.inside).length;
  ctx.fillStyle=inside?"#ffd45d":"#65402e";ctx.fillRect(390,306,38,47);
  label("HOME",410,292,10,"#fff1cf");
@@ -479,6 +513,7 @@ function draw(ts){
   ctx.strokeStyle="#d7f4f0";ctx.lineWidth=2;ctx.beginPath();for(let x=0;x<=900;x+=30){const y=top+Math.sin(x*.03+t*3)*5;x?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke();
  }
  drawScenes(t);
+ if(flyerActive)drawFlyingMan(t);
  // darkness / rain
  if(dark){ctx.fillStyle="rgba(30,35,60,"+dark+")";ctx.fillRect(-10,-10,920,570);cloud(200,60,1.2,"#6b7080");cloud(520,50,1.4,"#5d6272");cloud(760,70,1.1,"#6b7080")}
  if(weather==="rain"||weather==="thunder"||weather==="flood"){
