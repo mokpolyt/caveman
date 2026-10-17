@@ -462,10 +462,43 @@ function drawPerson(p,t,x,y,mode){
  if(mode==="panic"||mode==="run"){label("💦",x-26,yy-26+Math.sin(t*10)*3,13)}
 }
 
+
+// New recurring arrivals and 14-minute location tour.
+let cloneCycle=0, planeCycle=0, locationCycle=0, cloneEvent=null, planeEvent=null;
+let sceneLocation="default", goodVisitors=[], hostileVisitors=[];
+function updateBigEvents(t,dt){
+ const c=Math.floor(t/180);
+ if(c>cloneCycle){cloneCycle=c;cloneEvent={age:0,x:rnd(130,770),done:false};$("caption").textContent="🧬 A clone machine drops from the sky!";}
+ if(cloneEvent){cloneEvent.age+=dt;if(cloneEvent.age>2.1&&!cloneEvent.done){cloneEvent.done=true;const x=cloneEvent.x;let p=pickAlive();if(p){p.tx=x;p.ty=370;p.act="run";p.timer=2;}for(let i=0;i<3;i++)addPerson("Clone "+(people.length+1),x-35+i*35,390);parts.push({type:"txt",s:"🧬 ONE IN, THREE OUT!",size:20,x,y:260,vy:-8,life:3,max:3});}if(cloneEvent.age>6)cloneEvent=null;}
+ const pc=Math.floor(t/240);
+ if(pc>planeCycle){planeCycle=pc;planeEvent={age:0,done:false,x:rnd(240,660)};$ ("caption").textContent="✈️ A plane drops two people!";}
+ if(planeEvent){planeEvent.age+=dt;if(planeEvent.age>2.5&&!planeEvent.done){planeEvent.done=true;for(let i=0;i<2;i++){const good=Math.random()<.4;const p=addPerson((good?"Friendly ":"Hostile ")+(people.length+1),planeEvent.x+(i?55:-55),385,true);p.visitorType=good?"good":"hostile";p.emo=good?"💚":"😈";if(good){p.breedClock=8;goodVisitors.push(p)}else hostileVisitors.push(p);}parts.push({type:"txt",s:"40% GOOD · 60% HOSTILE",size:17,x:450,y:245,vy:-7,life:3,max:3});}
+  if(planeEvent.age>6)planeEvent=null;}
+ // Friendly arrivals reproduce; each hostile arrival targets two villagers once.
+ goodVisitors=goodVisitors.filter(p=>people.includes(p));
+ goodVisitors.forEach(p=>{if(!p.dead&&!p.bredOut){p.breedClock=(p.breedClock||8)-dt;if(p.breedClock<=0){p.bredOut=true;for(let i=0;i<2;i++)addPerson("Newborn "+(people.length+1),p.x+rnd(-30,30),p.y);parts.push({type:"txt",s:"💚 They had children!",size:16,x:p.x,y:p.y-80,vy:-8,life:2.5,max:2.5});}}});
+ hostileVisitors=hostileVisitors.filter(p=>people.includes(p));
+ hostileVisitors.forEach(p=>{if(!p.dead&&!p.attackedTwice&&t>(p.hostileNext||0)){p.hostileNext=t+999999;p.attackedTwice=true;const victims=alive().filter(v=>v!==p).sort(()=>Math.random()-.5).slice(0,2);victims.forEach(v=>{parts.push({type:"txt",s:"⚔️",size:24,x:v.x,y:v.y-30,vy:-10,life:1.2,max:1.2});kill(v)});p.emo="🗡️";}});
+ const lc=Math.floor(t/840);
+ if(lc!==locationCycle){locationCycle=lc;sceneLocation=lc%6===0?"default":["desert","airport","waste","sky","cave"][((lc-1)%5)];const labels={default:"🏞️ Back to the default village",desert:"🏜️ The tribe has reached the desert",airport:"🛫 An airport appears",waste:"☢️ Wasted land",sky:"☁️ Above the sky",cave:"🔥 A cave with fire"};$("caption").textContent=labels[sceneLocation]||labels.default;}
+}
+function drawAltLocation(){
+ if(sceneLocation==="default")return;
+ const skies={desert:["#f7d18a","#d99b57"],airport:["#9bc7e8","#dfeaf1"],waste:["#6d7470","#a6a18c"],sky:["#367bc1","#c1e7ff"],cave:["#251e29","#624332"]};
+ const c=skies[sceneLocation];const g=ctx.createLinearGradient(0,0,0,560);g.addColorStop(0,c[0]);g.addColorStop(1,c[1]);ctx.fillStyle=g;ctx.fillRect(0,0,900,560);
+ if(sceneLocation==="desert"){ctx.fillStyle="#d4a35f";ctx.beginPath();ctx.moveTo(0,330);ctx.quadraticCurveTo(200,230,390,340);ctx.quadraticCurveTo(650,220,900,320);ctx.lineTo(900,560);ctx.lineTo(0,560);ctx.fill();for(let i=0;i<5;i++)bigEmoji("🌵",70+i*190,405+(i%2)*20,45);bigEmoji("☀️",760,80,55);}
+ if(sceneLocation==="airport"){ctx.fillStyle="#777f87";ctx.fillRect(0,370,900,190);ctx.fillStyle="#f4f0d8";for(let x=0;x<900;x+=100)ctx.fillRect(x,455,50,5);ctx.fillStyle="#d5dce0";ctx.fillRect(80,190,740,110);ctx.fillStyle="#9ac8dc";for(let x=110;x<800;x+=65)ctx.fillRect(x,210,45,38);bigEmoji("✈️",470,150,75);label("TINY TRIBE INTERNATIONAL",450,180,15);}
+ if(sceneLocation==="waste"){ctx.fillStyle="#77766b";ctx.fillRect(0,350,900,210);for(let i=0;i<9;i++){ctx.fillStyle=i%2?"#494d4a":"#99917b";ctx.fillRect(i*112,310+(i%3)*20,65,90);bigEmoji("☢️",i*112+32,335+(i%3)*20,23);}bigEmoji("🏚️",450,290,80);}
+ if(sceneLocation==="sky"){ctx.fillStyle="#d9f3ff";for(let i=0;i<8;i++)cloud(i*130-30,160+(i%3)*85,.9,"#fff");bigEmoji("☁️",150,340,90);bigEmoji("☁️",730,330,100);label("ABOVE THE CLOUDS",450,80,22,"#fff");}
+ if(sceneLocation==="cave"){ctx.fillStyle="#32232b";ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(900,0);ctx.lineTo(900,230);ctx.quadraticCurveTo(450,80,0,230);ctx.fill();ctx.fillStyle="#211a20";ctx.fillRect(0,430,900,130);bigEmoji("🔥",450,430,75);bigEmoji("🔥",350,450,38);bigEmoji("🔥",550,450,42);}
+ label(({desert:"DESERT",airport:"AIRPORT",waste:"WASTED LAND",sky:"ABOVE THE SKY",cave:"FIRE CAVE"})[sceneLocation],450,35,22,sceneLocation==="cave"?"#ffd39a":"#fff");
+}
+
 function draw(ts){
  const t=ts/1000;
  const dt=Math.min(.05,(ts-(draw.last||ts))/1000);draw.last=ts;
  updateWorldCycles(t);
+ updateBigEvents(t,dt);
  update(dt,t);
  ctx.save();ctx.clearRect(0,0,900,560);
  if(shake>0)ctx.translate(Math.sin(t*60)*5*shake,Math.cos(t*73)*4*shake);
@@ -495,6 +528,7 @@ function draw(ts){
   ctx.fillStyle="#a77b4c";ctx.beginPath();ctx.roundRect(335,265,150,88,7);ctx.fill();
   ctx.fillStyle="#c18b55";ctx.beginPath();ctx.moveTo(315,275);ctx.lineTo(410,205);ctx.lineTo(505,275);ctx.closePath();ctx.fill();
  }
+ drawAltLocation();
  const inside=people.filter(p=>p.inside).length;
  ctx.fillStyle=inside?"#ffd45d":"#65402e";ctx.fillRect(390,306,38,47);
  label("HOME",410,292,10,"#fff1cf");
@@ -515,6 +549,8 @@ function draw(ts){
   ctx.strokeStyle="#d7f4f0";ctx.lineWidth=2;ctx.beginPath();for(let x=0;x<=900;x+=30){const y=top+Math.sin(x*.03+t*3)*5;x?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke();
  }
  drawScenes(t);
+ if(cloneEvent){const a=cloneEvent.age,x=cloneEvent.x,y=Math.min(330,a*150);bigEmoji("🧬",x,y,60);ctx.fillStyle="#626a70";ctx.fillRect(x-42,y+20,84,64);ctx.fillStyle="#9cf4e5";ctx.fillRect(x-26,y+32,52,28);label("CLONE MACHINE",x,y+100,12);if(a>1.4)label("ENTER → ×3",x,y+120,13);}
+ if(planeEvent){const a=planeEvent.age,x=planeEvent.x;bigEmoji("✈️",a<2.5?900-a*220:x,65+a*12,65);if(a>1.4&&a<3.5){bigEmoji("🪂",x-35,180+(a-1.4)*60,28);bigEmoji("🪂",x+35,180+(a-1.4)*60,28);}if(a>2.5)label("💚 / 😈",x,280,22);}
  if(flyerActive)drawFlyingMan(t);
  // darkness / rain
  if(dark){ctx.fillStyle="rgba(30,35,60,"+dark+")";ctx.fillRect(-10,-10,920,570);cloud(200,60,1.2,"#6b7080");cloud(520,50,1.4,"#5d6272");cloud(760,70,1.1,"#6b7080")}
